@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
-import { Plus, Map, LayoutGrid, List, Magnet } from 'lucide-react';
+import { Plus, Map, LayoutGrid, List, Magnet, Clock, Image, BarChart3, Layers } from 'lucide-react';
 import { useFridgeMagnetStore } from '@/store/useFridgeMagnetStore';
-import type { FridgeMagnet, FilterOptions } from '@/types';
+import type { FridgeMagnet } from '@/types';
 import StatisticsPanel from '@/components/StatisticsPanel';
 import FilterPanel from '@/components/FilterPanel';
 import CollectionMap from '@/components/CollectionMap';
@@ -10,40 +10,50 @@ import FridgeMagnetCard from '@/components/FridgeMagnetCard';
 import FridgeMagnetDetail from '@/components/FridgeMagnetDetail';
 import FridgeMagnetForm from '@/components/FridgeMagnetForm';
 import ExportPanel from '@/components/ExportPanel';
+import TimelineView from '@/components/TimelineView';
+import CollectionWallView from '@/components/CollectionWallView';
 
-type ViewMode = 'grid' | 'map' | 'browse';
+type ViewMode = 'grid' | 'map' | 'browse' | 'timeline' | 'wall' | 'stats';
 
 export default function Home() {
-  const magnets = useFridgeMagnetStore((s) => s.magnets);
-  const filters = useFridgeMagnetStore((s) => s.filters);
   const deleteMagnet = useFridgeMagnetStore((s) => s.deleteMagnet);
+  const getFilteredMagnets = useFridgeMagnetStore((s) => s.getFilteredMagnets);
+  const getSortedMagnets = useFridgeMagnetStore((s) => s.getSortedMagnets);
+  const checkAndUnlockAchievements = useFridgeMagnetStore((s) => s.checkAndUnlockAchievements);
 
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [formOpen, setFormOpen] = useState(false);
+  const [isBatchMode, setIsBatchMode] = useState(false);
+  const [batchCount, setBatchCount] = useState(0);
   const [editingMagnet, setEditingMagnet] = useState<FridgeMagnet | null>(null);
   const [detailMagnet, setDetailMagnet] = useState<FridgeMagnet | null>(null);
 
   const filteredMagnets = useMemo(() => {
-    return magnets.filter((m) => {
-      if (filters.material !== '全部' && m.material !== filters.material) return false;
-      if (filters.category !== '全部' && m.category !== filters.category) return false;
-      if (filters.year !== '全部') {
-        const year = new Date(m.purchaseDate).getFullYear();
-        if (year !== filters.year) return false;
-      }
-      if (filters.displayStatus !== '全部' && m.displayStatus !== filters.displayStatus)
-        return false;
-      return true;
-    });
-  }, [magnets, filters]);
+    return getSortedMagnets(getFilteredMagnets());
+  }, [getFilteredMagnets, getSortedMagnets]);
 
   const handleAdd = () => {
     setEditingMagnet(null);
+    setIsBatchMode(false);
+    setBatchCount(0);
     setFormOpen(true);
+  };
+
+  const handleBatchAdd = () => {
+    setEditingMagnet(null);
+    setIsBatchMode(true);
+    setBatchCount(0);
+    setFormOpen(true);
+  };
+
+  const handleBatchAddNext = () => {
+    setBatchCount((prev) => prev + 1);
+    checkAndUnlockAchievements();
   };
 
   const handleEdit = (magnet: FridgeMagnet) => {
     setEditingMagnet(magnet);
+    setIsBatchMode(false);
     setFormOpen(true);
   };
 
@@ -57,6 +67,10 @@ export default function Home() {
   const handleFormClose = () => {
     setFormOpen(false);
     setEditingMagnet(null);
+    setIsBatchMode(false);
+    if (batchCount > 0) {
+      checkAndUnlockAchievements();
+    }
   };
 
   return (
@@ -85,6 +99,7 @@ export default function Home() {
                       ? 'bg-white text-terracotta-600 shadow-sm'
                       : 'text-ink-500 hover:text-ink-700'
                   }`}
+                  title="网格视图"
                 >
                   <LayoutGrid className="w-4 h-4" />
                 </button>
@@ -95,6 +110,7 @@ export default function Home() {
                       ? 'bg-white text-terracotta-600 shadow-sm'
                       : 'text-ink-500 hover:text-ink-700'
                   }`}
+                  title="地图视图"
                 >
                   <Map className="w-4 h-4" />
                 </button>
@@ -105,25 +121,69 @@ export default function Home() {
                       ? 'bg-white text-terracotta-600 shadow-sm'
                       : 'text-ink-500 hover:text-ink-700'
                   }`}
+                  title="浏览视图"
                 >
                   <List className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('timeline')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    viewMode === 'timeline'
+                      ? 'bg-white text-terracotta-600 shadow-sm'
+                      : 'text-ink-500 hover:text-ink-700'
+                  }`}
+                  title="时间线"
+                >
+                  <Clock className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('wall')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    viewMode === 'wall'
+                      ? 'bg-white text-terracotta-600 shadow-sm'
+                      : 'text-ink-500 hover:text-ink-700'
+                  }`}
+                  title="收藏墙"
+                >
+                  <Image className="w-4 h-4" />
+                </button>
+                <button
+                  onClick={() => setViewMode('stats')}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    viewMode === 'stats'
+                      ? 'bg-white text-terracotta-600 shadow-sm'
+                      : 'text-ink-500 hover:text-ink-700'
+                  }`}
+                  title="统计分析"
+                >
+                  <BarChart3 className="w-4 h-4" />
                 </button>
               </div>
 
               <ExportPanel />
 
-              <button onClick={handleAdd} className="btn-primary gap-1.5">
-                <Plus className="w-4 h-4" />
-                添加
-              </button>
+              <div className="flex items-center gap-1">
+                <button onClick={handleAdd} className="btn-primary gap-1.5">
+                  <Plus className="w-4 h-4" />
+                  添加
+                </button>
+                <button
+                  onClick={handleBatchAdd}
+                  className="btn-secondary gap-1.5"
+                  title="批量添加多个藏品"
+                >
+                  <Layers className="w-4 h-4" />
+                  批量
+                </button>
+              </div>
             </div>
           </div>
         </div>
       </header>
 
       <main className="container py-6 space-y-6">
-        <StatisticsPanel />
-        <FilterPanel />
+        {viewMode !== 'stats' && <StatisticsPanel />}
+        {viewMode !== 'stats' && viewMode !== 'wall' && <FilterPanel />}
 
         {viewMode === 'grid' && (
           <div>
@@ -143,9 +203,7 @@ export default function Home() {
                   还没有冰箱贴
                 </h3>
                 <p className="text-ink-500 mb-6">
-                  {magnets.length === 0
-                    ? '开始记录你的第一枚收藏吧'
-                    : '没有符合筛选条件的藏品'}
+                  开始记录你的第一枚收藏吧
                 </p>
                 <button onClick={handleAdd} className="btn-primary gap-1.5">
                   <Plus className="w-4 h-4" />
@@ -196,6 +254,16 @@ export default function Home() {
         {viewMode === 'browse' && (
           <CountryCityBrowser onMagnetClick={(magnet) => setDetailMagnet(magnet)} />
         )}
+
+        {viewMode === 'timeline' && (
+          <TimelineView onMagnetClick={(magnet) => setDetailMagnet(magnet)} />
+        )}
+
+        {viewMode === 'wall' && (
+          <CollectionWallView onMagnetClick={(magnet) => setDetailMagnet(magnet)} />
+        )}
+
+        {viewMode === 'stats' && <StatisticsPanel fullView />}
       </main>
 
       <footer className="border-t border-ink-100 mt-12">
@@ -210,7 +278,18 @@ export default function Home() {
         open={formOpen}
         onClose={handleFormClose}
         editMagnet={editingMagnet}
+        isBatch={isBatchMode}
+        onBatchAdd={handleBatchAddNext}
       />
+
+      {batchCount > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40">
+          <div className="card px-4 py-2 bg-sage-500 text-white shadow-lg flex items-center gap-2">
+            <Layers className="w-4 h-4" />
+            <span className="text-sm font-medium">已批量添加 {batchCount} 枚，继续录入中...</span>
+          </div>
+        </div>
+      )}
 
       <FridgeMagnetDetail
         magnet={detailMagnet}

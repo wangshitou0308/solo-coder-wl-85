@@ -6,27 +6,17 @@ import PrintView from './PrintView';
 
 export default function ExportPanel() {
   const magnets = useFridgeMagnetStore((s) => s.magnets);
-  const filters = useFridgeMagnetStore((s) => s.filters);
+  const getFilteredMagnets = useFridgeMagnetStore((s) => s.getFilteredMagnets);
+  const getStatistics = useFridgeMagnetStore((s) => s.getStatistics);
 
   const [open, setOpen] = useState(false);
   const [useFiltered, setUseFiltered] = useState(true);
   const [showPrintView, setShowPrintView] = useState(false);
 
-  const filteredMagnets = useMemo(() => {
-    return magnets.filter((m) => {
-      if (filters.material !== '全部' && m.material !== filters.material) return false;
-      if (filters.category !== '全部' && m.category !== filters.category) return false;
-      if (filters.year !== '全部') {
-        const year = new Date(m.purchaseDate).getFullYear();
-        if (year !== filters.year) return false;
-      }
-      if (filters.displayStatus !== '全部' && m.displayStatus !== filters.displayStatus)
-        return false;
-      return true;
-    });
-  }, [magnets, filters]);
-
+  const filteredMagnets = useMemo(() => getFilteredMagnets(), [getFilteredMagnets]);
   const sourceMagnets = useFiltered ? filteredMagnets : magnets;
+
+  const allStats = useMemo(() => getStatistics(), [getStatistics]);
 
   const stats = useMemo(() => {
     const countries = new Set(sourceMagnets.map((m) => m.country));
@@ -38,14 +28,52 @@ export default function ExportPanel() {
       cityCount: cities.size,
       totalCost,
       currency: 'CNY',
+      rating: sourceMagnets.length > 0
+        ? (sourceMagnets.reduce((sum, m) => sum + m.rating, 0) / sourceMagnets.length).toFixed(1)
+        : '0',
+      treasureCount: sourceMagnets.filter((m) => m.isTreasure).length,
+      withStoryCount: sourceMagnets.filter((m) => m.story.trim()).length,
     };
   }, [sourceMagnets]);
 
   const exportJSON = () => {
+    const exportMagnets = sourceMagnets.map((m) => ({
+      id: m.id,
+      name: m.name,
+      city: m.city,
+      country: m.country,
+      coordinates: m.coordinates,
+      purchaseLocation: m.purchaseLocation,
+      shopName: m.shopName,
+      travelCompanions: m.travelCompanions,
+      travelTags: m.travelTags,
+      notes: m.notes,
+      purchaseDate: m.purchaseDate,
+      material: m.material,
+      category: m.category,
+      width: m.width,
+      height: m.height,
+      price: m.price,
+      currency: m.currency,
+      rating: m.rating,
+      isTreasure: m.isTreasure,
+      frontImage: m.frontImage,
+      sideImage: m.sideImage,
+      photos: m.photos,
+      story: m.story,
+      displayStatus: m.displayStatus,
+      createdAt: m.createdAt,
+      updatedAt: m.updatedAt,
+    }));
+
     const data = {
       exportedAt: new Date().toISOString(),
-      statistics: stats,
-      magnets: sourceMagnets,
+      version: '2.0',
+      statistics: {
+        ...stats,
+        allStatistics: allStats,
+      },
+      magnets: exportMagnets,
     };
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
