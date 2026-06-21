@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { FridgeMagnet, FilterOptions, Statistics } from '@/types';
+import { calculateTotalCNY } from '@/utils/currency';
 
 const generateId = () =>
   Date.now().toString(36) + Math.random().toString(36).substring(2);
@@ -220,19 +221,12 @@ export const useFridgeMagnetStore = create<FridgeMagnetState>()(
         const { magnets } = get();
         const countries = new Set(magnets.map((m) => m.country));
         const cities = new Set(magnets.map((m) => `${m.country}-${m.city}`));
-        const totalCost = magnets.reduce((sum, m) => {
-          if (m.currency === 'CNY') return sum + m.price;
-          if (m.currency === 'EUR') return sum + m.price * 7.8;
-          if (m.currency === 'JPY') return sum + m.price * 0.047;
-          if (m.currency === 'GBP') return sum + m.price * 9.2;
-          if (m.currency === 'MXN') return sum + m.price * 0.38;
-          return sum + m.price;
-        }, 0);
+        const totalCost = calculateTotalCNY(magnets);
         return {
           totalCount: magnets.length,
           countryCount: countries.size,
           cityCount: cities.size,
-          totalCost: Math.round(totalCost * 100) / 100,
+          totalCost,
           currency: 'CNY',
         };
       },
